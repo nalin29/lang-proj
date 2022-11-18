@@ -10,7 +10,7 @@ import torch
 from collections import OrderedDict
 
 import dataloaders
-from steps.traintest import train, validate
+from steps.traintest import train, validate, train_vq, validate_vq
 from run_utils import str2bool, set_seeds, create_audio_model, create_image_model, load_state_dict
 
 
@@ -45,6 +45,21 @@ def load_dataloaders(data_train, data_val, batch_size, num_workers):
 
     return train_loader, val_loader
 
+""" def load_dataloaders(data_train, data_val, batch_size, num_workers):
+    print('loading data from %s / %s' % (data_train, data_val))
+    train_dset = dataloaders.ImageCaptionDataset(data_train)
+    train_loader = torch.utils.data.dataloader.DataLoader(
+            train_dset, batch_size=batch_size, shuffle=True, 
+            num_workers=num_workers, pin_memory=True)
+    
+    val_dset = dataloaders.ImageCaptionDataset(
+            data_val, image_conf={'center_crop':True})
+    val_loader = torch.utils.data.dataloader.DataLoader(
+            val_dset, batch_size=batch_size, shuffle=False,
+            num_workers=0, pin_memory=True)
+
+    return train_loader, val_loader """
+
 
 def load_state_dicts(audio_model, image_model, seed_dir, seed_epoch):
     if seed_epoch > 0:
@@ -70,9 +85,9 @@ def get_default_parser(parser=None):
     
     # ResDavenet args
     parser.add_argument('--audio-model', type=str, default='ResDavenetVQ', 
-            choices=['ResDavenetVQ'], help='audio model architecture')
+            choices=['ResDavenetVQ', 'ResDavenet', 'ResDavenetSE', 'ResDavenetVQSE', 'ResDavenetVQAttn','ResDavenetAttn'], help='audio model architecture')
     parser.add_argument('--image-model', type=str, default='Resnet50', 
-            choices=['Resnet50'], help='image model architecture')
+            choices=['Resnet50', 'Resnet18'], help='image model architecture')
     parser.add_argument('--freeze-image-model', type=str2bool, default=False,
             help='Freeze image model parameters.')
     parser.add_argument('--pretrained-image-model', type=str2bool, default=True, 
@@ -220,11 +235,17 @@ if __name__ == '__main__':
             os.makedirs('%s/models' % exp_dir)
             with open('%s/args.pkl' % exp_dir, 'wb') as f:
                 pickle.dump(args, f)
-    
-        train(audio_model, image_model, train_loader, val_loader,
-              args, exp_dir, resume)
+        if args.audio_model == "ResDavenetVQ" or args.audio_model == "ResDavenetVQSE":
+               train_vq(audio_model, image_model, train_loader, val_loader,
+              args, exp_dir, resume) 
+        else:
+                train(audio_model, image_model, train_loader, val_loader,
+                args, exp_dir, resume)
     elif mode == 'eval':
         load_state_dicts(audio_model, image_model, exp_dir, -1)
-        validate(audio_model, image_model, val_loader, args)
+        if args.audio_model == "ResDavenetVQ" or args.audio_model == "ResDavenetVQSE":
+                validate_vq(audio_model, image_model, val_loader, args)
+        else:
+                validate(audio_model, image_model, val_loader, args)
     else:
         raise ValueError('Unsupported mode %s' % mode)

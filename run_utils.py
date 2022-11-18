@@ -6,7 +6,13 @@ import random
 import torch
 
 from models.AudioModels import ResDavenetVQ
+from models.AudioModels import ResDavenet
 from models.ImageModels import Resnet50
+from models.ImageModels import Resnet18
+from models.AudioModels import SEBasicBlock
+from models.ImageModels import SqueezeNet
+from models.AudioModels import AttnBlock
+
 
 
 def str2bool(v):
@@ -47,6 +53,38 @@ def create_audio_model(audio_model_name, VQ_sizes, layer_widths, layer_depths,
                 init_ema_mass=init_ema_mass,
                 init_std=init_std, 
                 nonneg_init=nonneg_init)
+    elif audio_model_name == 'ResDavenetVQSE':
+        audio_model = ResDavenetVQ(
+                block=SEBasicBlock,
+                layers=layer_depths, 
+                layer_widths=layer_widths, 
+                convsize=convsize, 
+                codebook_Ks=vq_sizes, 
+                commitment_cost=VQ_commitment_cost, 
+                jitter_p=jitter, 
+                vqs_enabled=vqs_enabled, 
+                init_ema_mass=init_ema_mass,
+                init_std=init_std, 
+                nonneg_init=nonneg_init)
+    elif audio_model_name == 'ResDavenetVQAttn':
+        audio_model = ResDavenetVQ(
+                block=AttnBlock,
+                layers=layer_depths, 
+                layer_widths=layer_widths, 
+                convsize=convsize, 
+                codebook_Ks=vq_sizes, 
+                commitment_cost=VQ_commitment_cost, 
+                jitter_p=jitter, 
+                vqs_enabled=vqs_enabled, 
+                init_ema_mass=init_ema_mass,
+                init_std=init_std, 
+                nonneg_init=nonneg_init)
+    elif audio_model_name == 'ResDavenet':
+        audio_model = ResDavenet(layers=layer_depths, layer_widths=layer_widths, convsize=convsize)
+    elif audio_model_name == 'ResDavenetAttn':
+        audio_model = ResDavenet(block=AttnBlock, layers=layer_depths, layer_widths=layer_widths, convsize=convsize)
+    elif audio_model_name == 'ResDavenetSE':
+        audio_model = ResDavenet(block=SEBasicBlock, layers=layer_depths, layer_widths=layer_widths, convsize=convsize)
     else:
         raise ValueError('Unknown audio model: %s' % audio_model_name)
     
@@ -56,6 +94,10 @@ def create_audio_model(audio_model_name, VQ_sizes, layer_widths, layer_depths,
 def create_image_model(image_model_name, pretrained_image_model):
     if image_model_name == 'Resnet50':
         image_model = Resnet50(pretrained=pretrained_image_model)
+    elif image_model_name == 'Resnet18':
+        image_model =  Resnet18(pretrained=pretrained_image_model)
+    elif image_model_name == 'Squeezenet':
+        image_model =  SqueezeNet(pretrained=pretrained_image_model)
     else:
         raise ValueError('Unknown image model: %s' % image_model_name)
 

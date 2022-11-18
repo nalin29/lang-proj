@@ -65,6 +65,86 @@ class SpeechBasicBlock(nn.Module):
         out = self.relu(out)
         return out
 
+class AttnBlock(nn.Module):
+    expansion = 1
+    def __init__(self, inplanes, planes, width=9, stride=1, downsample=None, num_attention_heads=4, dropout=0.0):
+        super(SpeechBasicBlock, self).__init__()
+        self.self_attn = torch.nn.MultiheadAttention(inplanes, num_attention_heads, dropout=dropout)
+        self.conv1 = conv1d(inplanes, planes, width=width, stride=stride)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = conv1d(planes, planes, width=width)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        residual = x
+        out = self.self_attn(x)
+        out = self.conv1(out)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        if self.downsample is not None:
+            residual = self.downsample(x)
+        out += residual
+        out = self.relu(out)
+        return out
+
+class SE_Block(nn.Module):
+    def __init__(self, c, r=16):
+        super().__init__()
+        self.squeeze = nn.AdaptiveAvgPool2d(1)
+        self.excitation = nn.Sequential(
+            nn.Linear(c, c // r, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(c // r, c, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        bs, c, _, _ = x.shape
+        y = self.squeeze(x).view(bs, c)
+        y = self.excitation(y).view(bs, c, 1, 1)
+        return x * y.expand_as(x)
+
+class SEBasicBlock(nn.Module):
+    expansion = 1
+
+    def __init__(self, inplanes, planes, stride=1, width=9, downsample=None, norm_layer=None, r=16):
+        super(SEBasicBlock, self).__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        self.conv1 = conv1d(inplanes, planes, width=width, stride=stride)
+        self.bn1 = norm_layer(planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = conv1d(planes, planes, width=width)
+        self.bn2 = norm_layer(planes)
+        self.downsample = downsample
+        self.stride = stride
+        self.se = SE_Block(planes, r)
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.se(out)
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out += identity
+        out = self.relu(out)
+
+        return out
+
+
 
 class ResDavenet(nn.Module):
     def __init__(self, feat_dim=40, block=SpeechBasicBlock, layers=[2, 2, 2, 2],
@@ -123,6 +203,7 @@ class ResDavenet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         x = x.squeeze(2)
+        x = x.reshape(x.shape[0], x.shape[1], 1, x.shape[2])
         return x
 
 
@@ -214,33 +295,33 @@ class ResDavenetVQ(ResDavenet):
 
         x = self.relu(self.bn1(self.conv1(x)))
         if nframes is not None:
-            cur_nframes = nframes / round(L / x.size(-1))
+            cur_nframes = nframes // round(L / x.size(-1))
         (quant_losses[0], x, flat_inputs[0],
          flat_onehots[0]) = self.maybe_quantize(x, 0, cur_nframes)
         x = self.maybe_jitter(x)
 
         x = self.layer1(x)
         if nframes is not None:
-            cur_nframes = nframes / round(L / x.size(-1))
+            cur_nframes = nframes // round(L / x.size(-1))
         (quant_losses[1], x, flat_inputs[1],
          flat_onehots[1]) = self.maybe_quantize(x, 1, cur_nframes)
         x = self.maybe_jitter(x)
         
         x = self.layer2(x)
         if nframes is not None:
-            cur_nframes = nframes / round(L / x.size(-1))
+            cur_nframes = nframes // round(L / x.size(-1))
         (quant_losses[2], x, flat_inputs[2],
          flat_onehots[2]) = self.maybe_quantize(x, 2, cur_nframes)
 
         x = self.layer3(x)
         if nframes is not None:
-            cur_nframes = nframes / round(L / x.size(-1))
+            cur_nframes = nframes // round(L / x.size(-1))
         (quant_losses[3], x, flat_inputs[3],
          flat_onehots[3]) = self.maybe_quantize(x, 3, cur_nframes)
         
         x = self.layer4(x)
         if nframes is not None:
-            cur_nframes = nframes / round(L / x.size(-1))
+            cur_nframes = nframes // round(L / x.size(-1))
         (quant_losses[4], x, flat_inputs[4],
          flat_onehots[4]) = self.maybe_quantize(x, 4, cur_nframes)
         
