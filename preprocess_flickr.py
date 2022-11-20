@@ -3,7 +3,7 @@ import os
 import argparse
 
 
-def create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to_spkr_file, split, train, dev, test):
+def create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to_spkr_file, wav_to_align_file, split, train, dev, test):
     jsons = []
     if not split:
         data_json = dict()
@@ -17,6 +17,14 @@ def create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to
             for line in f.readlines():
                 line = line.split(maxsplit=1)
                 wav_to_spkr[line[0]] = line[1][:-1]
+            f.close()
+
+        wav_to_align = dict()
+        with open(wav_to_align_file) as f:
+            for line in f.readlines():
+                line = line.split(maxsplit=1)
+                key = line[0] + '.wav'
+                wav_to_align[key] = line[1]
             f.close()
 
         image_to_cap = dict()
@@ -40,7 +48,7 @@ def create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to
                     "wav": wav,
                     "image": image, 
                     "scenelabel": "",
-                    "text_alignment": "<None>"
+                    "text_alignment": wav_to_align[wav]
                 }
                 data.append(datum)
             f.close()
@@ -87,6 +95,14 @@ def create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to
                 wav_to_spkr[line[0]] = line[1][:-1]
             f.close()
 
+        wav_to_align = dict()
+        with open(wav_to_align_file) as f:
+            for line in f.readlines():
+                line = line.split(maxsplit=1)
+                key = line[0] + ".wav"
+                wav_to_align[key] = line[1]
+            f.close()
+
         image_to_cap = dict()
         with open(image_to_cap_file) as f:
             for line in f.readlines():
@@ -101,6 +117,8 @@ def create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to
                 image = line[1]
                 caption = line[2]
                 asr_text_index = image + caption
+                if wav not in wav_to_align:
+                    wav_to_align[wav] = "<None>"
                 datum = {
                     "uttid": asr_text_index,
                     "speaker": wav_to_spkr[wav],
@@ -108,7 +126,7 @@ def create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to
                     "wav": wav,
                     "image": image, 
                     "scenelabel": "",
-                    "text_alignment": "<None>"
+                    "text_alignment": wav_to_align[wav]
                 }
                 if image in train_images:
                     train_data.append(datum)
@@ -135,7 +153,8 @@ if __name__ == '__main__':
     parser.add_argument('wav-dir', type=str, help='path to directory of wav files')
     parser.add_argument('wav-to-cap', type=str, help='path to mapping of wav files to associated captions')
     parser.add_argument('image-to-cap', type=str, help='path to mapping of images to associated captions')
-    parser.add_argument('wav-to-spkr', type=str, help='path to mapping of wave files to associated speaker')
+    parser.add_argument('wav-to-spkr', type=str, help='path to mapping of wav files to associated speaker')
+    parser.add_argument('wav-to-align', type=str, help='path to mapping of wav files to text alignments')
     parser.add_argument('-s', '--split', type=str, nargs=3, metavar=('TRAIN_FILE', 'DEV_FILE', 'TEST_FILE'), help='uses train/dev/test split provided')
     
     args = parser.parse_args()
@@ -150,12 +169,13 @@ if __name__ == '__main__':
     wav_to_cap_file = get_and_del_attr('wav-to-cap')
     image_to_cap_file = get_and_del_attr('image-to-cap')
     wav_to_spkr_file = get_and_del_attr('wav-to-spkr')
+    wav_to_align_file = get_and_del_attr('wav-to-align')
     split = get_and_del_attr('split')
     if split:
         train = split[0]
         dev = split[1]
         test = split[2]
-        jsons = create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to_spkr_file, True, train, dev, test)
+        jsons = create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to_spkr_file, wav_to_align_file, True, train, dev, test)
         with open("flickr_data_train.json", "w+") as train_file:
             train_file.write(json.dumps(jsons[0], indent=4))
         with open("flickr_data_dev.json", "w+") as dev_file:
@@ -164,6 +184,6 @@ if __name__ == '__main__':
             test_file.write(json.dumps(jsons[2], indent=4))
     else:
         with open("flickr_data.json", "w+") as outfile:
-            outfile.write(json.dumps(create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to_spkr_file, False, '', '', '')[0], indent=4))
+            outfile.write(json.dumps(create_json(image_path, wav_path, wav_to_cap_file, image_to_cap_file, wav_to_spkr_file, wav_to_align_file, False, '', '', '')[0], indent=4))
 
    

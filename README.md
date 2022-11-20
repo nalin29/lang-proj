@@ -81,7 +81,7 @@ Users would have to modify the code correspondingly to use
 
 ### Flickr8k
 ```
-python3 preprocess_flickr.py flickr_data/images/ flickr_data/wavs/ flickr_data/wav2capt.txt flickr_data/Flickr8k.token.txt flickr_data/wav2spk.txt -s flickr_data/Flickr_8k.trainImages.txt flickr_data/Flickr_8k.devImages.txt flickr_data/Flickr_8k.testImages.txt 
+python3 preprocess_flickr.py flickr_data/images/ flickr_data/wavs/ flickr_data/wav2capt.txt flickr_data/Flickr8k.token.txt flickr_data/wav2spk.txt raw_ali.txt -s flickr_data/Flickr_8k.trainImages.txt flickr_data/Flickr_8k.devImages.txt flickr_data/Flickr_8k.testImages.txt
 ```
 
 ## Interactive Qualtitative Evaluation
