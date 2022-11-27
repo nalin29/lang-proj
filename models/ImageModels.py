@@ -56,9 +56,31 @@ class SqueezeNet(imagemodels.SqueezeNet):
             model_url = imagemodels.squeezenet.model_urls['squeezenet1_1']
             self.load_state_dict(model_zoo.load_url(model_url))
         self.classifier = None
-        self.embedder = nn.Conv2d(64, embedding_dim, kernel_size=1, stride=1, padding=0)
+        self.embedder = nn.Conv2d(512, embedding_dim, kernel_size=1, stride=1, padding=0)
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)
         x = self.embedder(x)
         return x
 
+class ViT(imagemodels.VisionTransformer):
+    def __init__(self, embedding_dim=1024, pretrained= False):
+
+        super(ViT, self).__init__(image_size=224, patch_size=16, num_layers=12, num_heads=12, hidden_dim=768, mlp_dim=3072)
+        if pretrained:
+            weights = imagemodels.ViT_B_16_Weights(imagemodels.ViT_B_16_Weights.DEFAULT)
+            self.load_state_dict(weights.get_state_dict(progress=True))
+        self.embedder = nn.Linear(768, embedding_dim)
+    def forward(self, x: torch.Tensor):
+        x = self._process_input(x)
+        n = x.shape[0]
+
+        batch_class_token = self.class_token.expand(n, -1, -1)
+        x = torch.cat([batch_class_token, x], dim=1)
+
+        x = self.encoder(x)
+
+        x = x[:, 0]
+
+        x = self.embedder(x)
+
+        return x.view(x.shape[0], 1024, 1, -1)

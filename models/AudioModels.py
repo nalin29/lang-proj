@@ -62,34 +62,32 @@ class SpeechBasicBlock(nn.Module):
         if self.downsample is not None:
             residual = self.downsample(x)
         out += residual
-        out = self.relu(out)
         return out
 
-class AttnBlock(nn.Module):
-    expansion = 1
-    def __init__(self, inplanes, planes, width=9, stride=1, downsample=None, num_attention_heads=4, dropout=0.0):
-        super(SpeechBasicBlock, self).__init__()
-        self.self_attn = torch.nn.MultiheadAttention(inplanes, num_attention_heads, dropout=dropout)
-        self.conv1 = conv1d(inplanes, planes, width=width, stride=stride)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv1d(planes, planes, width=width)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.downsample = downsample
-        self.stride = stride
+class Self_Attn(nn.Module):
+    def __init__(self,in_dim):
+        super(Self_Attn,self).__init__()
+        self.chanel_in = in_dim
+        self.activation = nn.ReLU(inplace=True)
+        
+        self.query_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//8 , kernel_size= 1)
+        self.key_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//8 , kernel_size= 1)
+        self.value_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim , kernel_size= 1)
+        self.gamma = nn.Parameter(torch.zeros(1))
 
-    def forward(self, x):
-        residual = x
-        out = self.self_attn(x)
-        out = self.conv1(out)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
-        if self.downsample is not None:
-            residual = self.downsample(x)
-        out += residual
-        out = self.relu(out)
+        self.softmax  = nn.Softmax(dim=-1) #
+    def forward(self,x):
+        m_batchsize,C,width ,height = x.size()
+        proj_query  = self.query_conv(x).view(m_batchsize,-1,width*height).permute(0,2,1)
+        proj_key =  self.key_conv(x).view(m_batchsize,-1,width*height)
+        energy =  torch.bmm(proj_query,proj_key)
+        attention = self.softmax(energy)
+        proj_value = self.value_conv(x).view(m_batchsize,-1,width*height)
+
+        out = torch.bmm(proj_value,attention.permute(0,2,1))
+        out = out.view(m_batchsize,C,width,height)
+        
+        out = self.gamma*out + x
         return out
 
 class SE_Block(nn.Module):
@@ -143,8 +141,6 @@ class SEBasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
-
-
 
 class ResDavenet(nn.Module):
     def __init__(self, feat_dim=40, block=SpeechBasicBlock, layers=[2, 2, 2, 2],
@@ -205,6 +201,29 @@ class ResDavenet(nn.Module):
         x = x.squeeze(2)
         x = x.reshape(x.shape[0], x.shape[1], 1, x.shape[2])
         return x
+
+class ResDavenetAttn(ResDavenet):
+    def __init__(self, feat_dim=40, block=SpeechBasicBlock, layers=[2, 2, 2, 2],
+                 layer_widths=[128, 128, 256, 512, 1024], convsize=9):
+        super().__init__(feat_dim=feat_dim, block=block, layers=layers, 
+                         layer_widths=layer_widths, convsize=convsize)
+
+    def _make_layer(self, block, planes, blocks, width=9, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                        kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion),
+            )       
+        layers = []
+        layers.append(block(self.inplanes, planes, width=width, stride=stride, 
+                            downsample=downsample))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes, width=width, stride=1))
+        layers.append(Self_Attn(self.inplanes))
+        return nn.Sequential(*layers)
 
 
 class ResDavenetVQ(ResDavenet):
@@ -384,3 +403,34 @@ class ResDavenetVQ(ResDavenet):
         """
         assert(hasattr(self, layer))
         return getattr(self, layer).get_embedding()
+
+class ResDavenetVQAttn(ResDavenetVQ):
+    def __init__(self, feat_dim=40, block=SpeechBasicBlock, 
+                 layers=[2, 2, 2, 2], layer_widths=[128, 128, 256, 512, 1024],
+                 convsize=9, codebook_Ks=[512, 512, 512, 512, 512], 
+                 commitment_cost=1, jitter_p=0.0, vqs_enabled=[0, 0, 0, 0, 0], 
+                 EMA_decay=0.99, init_ema_mass=1, init_std=1, 
+                 nonneg_init=False):
+        
+        super().__init__(feat_dim=feat_dim, block=block, 
+                 layers=layers, layer_widths=layer_widths,
+                 convsize=convsize, codebook_Ks=codebook_Ks, 
+                 commitment_cost=commitment_cost, jitter_p=jitter_p, vqs_enabled=vqs_enabled, 
+                 EMA_decay=EMA_decay, init_ema_mass=init_ema_mass, init_std=init_std, 
+                 nonneg_init=nonneg_init)
+    def _make_layer(self, block, planes, blocks, width=9, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                        kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion),
+            )       
+        layers = []
+        layers.append(block(self.inplanes, planes, width=width, stride=stride, 
+                            downsample=downsample))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes, width=width, stride=1))
+        layers.append(Self_Attn(self.inplanes))
+        return nn.Sequential(*layers)    

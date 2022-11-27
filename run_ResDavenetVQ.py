@@ -85,9 +85,9 @@ def get_default_parser(parser=None):
     
     # ResDavenet args
     parser.add_argument('--audio-model', type=str, default='ResDavenetVQ', 
-            choices=['ResDavenetVQ', 'ResDavenet', 'ResDavenetSE', 'ResDavenetVQSE', 'ResDavenetVQAttn','ResDavenetAttn'], help='audio model architecture')
+            choices=['ResDavenetVQ', 'ResDavenet', 'ResDavenetSE', 'ResDavenetVQSE','ResDavenetAttn', 'ResDavenetAttnSE', 'ResDavenetVQAttn', 'ResDavenetVQAttnSE'], help='audio model architecture')
     parser.add_argument('--image-model', type=str, default='Resnet50', 
-            choices=['Resnet50', 'Resnet18'], help='image model architecture')
+            choices=['Resnet50', 'Resnet18', 'Squeezenet', 'VisionTransformer'], help='image model architecture')
     parser.add_argument('--freeze-image-model', type=str2bool, default=False,
             help='Freeze image model parameters.')
     parser.add_argument('--pretrained-image-model', type=str2bool, default=True, 
@@ -235,7 +235,7 @@ if __name__ == '__main__':
             os.makedirs('%s/models' % exp_dir)
             with open('%s/args.pkl' % exp_dir, 'wb') as f:
                 pickle.dump(args, f)
-        if args.audio_model == "ResDavenetVQ" or args.audio_model == "ResDavenetVQSE":
+        if args.audio_model == "ResDavenetVQ" or args.audio_model == "ResDavenetVQSE" or args.audio_model == 'ResDavenetVQAttn' or args.audio_model == 'ResDavenetVQAttnSE':
                train_vq(audio_model, image_model, train_loader, val_loader,
               args, exp_dir, resume) 
         else:
@@ -243,7 +243,7 @@ if __name__ == '__main__':
                 args, exp_dir, resume)
     elif mode == 'eval':
         load_state_dicts(audio_model, image_model, exp_dir, -1)
-        if args.audio_model == "ResDavenetVQ" or args.audio_model == "ResDavenetVQSE":
+        if args.audio_model == "ResDavenetVQ" or args.audio_model == "ResDavenetVQSE" or args.audio_model == 'ResDavenetVQAttn' or args.audio_model == 'ResDavenetVQAttnSE':
                 validate_vq(audio_model, image_model, val_loader, args)
         else:
                 validate(audio_model, image_model, val_loader, args)
