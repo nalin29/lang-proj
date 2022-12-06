@@ -1,10 +1,11 @@
-# ResDAVEnet-VQ
-Official PyTorch implementation of [Learning Hierarchical Discrete Linguistic 
+# Based on ResDAVEnet-VQ
+Based on tthe PyTorch implementation of [Learning Hierarchical Discrete Linguistic 
 Units from Visually-Grounded Speech](https://openreview.net/forum?id=B1elCp4KwH)
 
 
 ## What is in this repo?
 - Multi-GPU training of ResDAVEnet-VQ
+- Augmented versions of the ResDaveNet-VQ model
 - Quantitative evaluation
   - Image-to-speech and speech-to-image retrieval
   - ZeroSpeech 2019 ABX phone-discriminability test
@@ -27,7 +28,7 @@ If you find the code useful, please cite
 }
 ```
 
-## Pre-trained models
+## Pre-trained models from the previous paper
 | Model               | R@10          | Link  | MD5 sum | 
 | -------------       |:-------------:| -----:| ------: |
 | {}                  | 0.735         | [gDrive](https://drive.google.com/file/d/1J-tw3eg3R5e9k0vIfQaBVKiaHyOJUcIB/view?usp=sharing) | e3f94990c72ce9742c252b2e04f134e4 |
@@ -41,6 +42,9 @@ If you find the code useful, please cite
 | {3}->{2,3}          | 0.760         | [gDrive](https://drive.google.com/file/d/1K23y5u4K14gMycP9XhkwTGWN-GHNCcYA/view?usp=sharing) | 6c92bcc4445895876a7840bc6e88892b |
 | {2,3}               | 0.667         | [gDrive](https://drive.google.com/file/d/1JHHgJ0wDlFs9Ol1Wo4kco7HSjc4zTy_Y/view?usp=sharing) | 7a98a661302939817a1450d033bc2fcc |
 
+
+## pre-trained models with new changes
+https://utexas.box.com/s/qx4k4e7anpmwo9qbbhu88l51s5ltx2jp
 
 ## Data preparation
 
